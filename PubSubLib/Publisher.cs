@@ -10,7 +10,7 @@ namespace PubSubLib
         {
             // Create a socket of a certain type.
             Socket publisher = new(ip.Host.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-            IPEndPoint endIP = new(ip.Host, ip.Port);
+            IPEndPoint endIP = new(ip.Host, ip.PubPort);
             // Create byte buffer.
             byte[] bytes = new byte[1024];
             try

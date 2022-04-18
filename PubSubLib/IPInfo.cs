@@ -10,11 +10,13 @@ namespace PubSubLib
     public class IPInfo
     {
         public IPAddress Host { get; }
-        public int Port { get; }
-        public IPInfo(IPAddress host, int port)
+        public int SubPort { get; }
+        public int PubPort { get; }
+        public IPInfo(IPAddress host, int subport, int pubport)
         {
             Host = host;
-            Port = port;
+            PubPort = pubport;
+            SubPort = subport;
         }
     }
 }

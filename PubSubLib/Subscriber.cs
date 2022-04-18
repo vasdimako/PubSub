@@ -14,7 +14,7 @@ namespace PubSubLib
         {
             // Create a socket of a certain type.
             Socket publisher = new(ip.Host.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-            IPEndPoint endIP = new(ip.Host, ip.Port);
+            IPEndPoint endIP = new(ip.Host, ip.SubPort);
             // Create byte buffer.
             byte[] bytes = new byte[1024];
             string published;
@@ -34,11 +34,13 @@ namespace PubSubLib
                 while (true)
                 {
                     int bytesRec = publisher.Receive(bytes);
-                    published = Encoding.ASCII.GetString(bytes, 0, bytesRec);
-                    Console.WriteLine("Message received: {0}", published);
-                    Console.ReadLine();
+                    if (bytesRec > 0) 
+                    {
+                        published = Encoding.ASCII.GetString(bytes, 0, bytesRec);
+                        Console.WriteLine("{0}", published);
+                    }
                 }
-                
+         
                 //Release socket.
                 publisher.Shutdown(SocketShutdown.Both);
                 publisher.Close();
