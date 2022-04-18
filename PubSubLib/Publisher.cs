@@ -27,7 +27,7 @@ namespace PubSubLib
 
                 // Receive response from remote device.
                 int bytesRec = publisher.Receive(bytes);
-                Console.WriteLine("Message received: {0}", Encoding.ASCII.GetString(bytes, 0, bytesRec));
+                Console.WriteLine("{0}", Encoding.ASCII.GetString(bytes, 0, bytesRec));
                 Console.ReadLine();
                 //Release socket.
                 publisher.Shutdown(SocketShutdown.Both);
