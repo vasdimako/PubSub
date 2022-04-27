@@ -11,7 +11,7 @@ namespace PubSubLib
     public class Subscriber
     {
         private string ID { get; }
-        private int Port { get; }
+        private int IncMsgPort { get; }
         public IPAddress BrokerIP { get; set; }
         private int BrokerPort { get; }
         private string[] CommandList { get; set; }
@@ -21,7 +21,7 @@ namespace PubSubLib
         }
         public string GetSubInfo()
         {
-            return (ID + "\n" + Port.ToString() + "\n" + BrokerIP.ToString() + "\n" + BrokerPort.ToString() + "\n" + CommandList.ToString());
+            return (ID + "\n" + IncMsgPort.ToString() + "\n" + BrokerIP.ToString() + "\n" + BrokerPort.ToString() + "\n" + CommandList.ToString());
         }
         public Subscriber(string run)
         {
@@ -38,7 +38,7 @@ namespace PubSubLib
                     }
                     case string s when s.StartsWith("r"):
                         {
-                            Port = Int32.Parse(arg.Substring(2).Trim());
+                            IncMsgPort = Int32.Parse(arg.Substring(2).Trim());
                             break;
                         }
                    case string s when s.StartsWith("h"):
@@ -62,7 +62,7 @@ namespace PubSubLib
 
 
         }
-        public void SubExecute(string command)
+        public void Subscribe(string command)
         {
             // Create a socket of a certain type.
             Socket subscriber = new(BrokerIP.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
@@ -81,7 +81,6 @@ namespace PubSubLib
                 {
                     // Encode the string into bytes.
                     byte[] msg = Encoding.ASCII.GetBytes(ID + " " + commands[1] + " " + commands[2]);
-                    Console.WriteLine(msg.ToString());
 
                     // Send the bytes.
                     int bytesSent = subscriber.Send(msg);
@@ -100,7 +99,6 @@ namespace PubSubLib
                 {
                     // Encode the string into bytes.
                     byte[] msg = Encoding.ASCII.GetBytes(ID + " " + commands[1] + " " + commands[2]);
-                    Console.WriteLine(msg.ToString());
 
                     // Send the bytes.
                     int bytesSent = subscriber.Send(msg);
@@ -131,7 +129,7 @@ namespace PubSubLib
             {
                 // Create response socket - note this only happens if command[1] is sub
                 Socket subResponse = new(BrokerIP.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-                IPEndPoint subReEndIP = new(BrokerIP, Port);
+                IPEndPoint subReEndIP = new(BrokerIP, IncMsgPort);
 
                 subResponse.Bind(subReEndIP);
                 subResponse.Listen(10);

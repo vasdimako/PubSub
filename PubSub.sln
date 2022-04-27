@@ -7,12 +7,13 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Publisher", "PubSub\Publish
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PubSubLib", "PubSubLib\PubSubLib.csproj", "{BFE1F7D4-D89A-41E5-AE70-5E897020AF13}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Server", "Server\Server.csproj", "{B61FA7BA-DCFA-4A1A-982B-3375F4A26BD9}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Broker", "Server\Broker.csproj", "{B61FA7BA-DCFA-4A1A-982B-3375F4A26BD9}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Subscriber", "Subscriber\Subscriber.csproj", "{C0A34FBB-2875-4741-9324-AB78B976D725}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{2D13995F-49A5-4A2A-B342-271D2294AF69}"
 	ProjectSection(SolutionItems) = preProject
+		publisher1.cmd = publisher1.cmd
 		subscriber1.cmd = subscriber1.cmd
 	EndProjectSection
 EndProject
