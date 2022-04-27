@@ -14,7 +14,6 @@ namespace PubSubLib
     {
         private static IPInfo IP { get; set;}
         private static Dictionary<string, List<string>> SubInfo { get; set; } = new Dictionary<string, List<string>>();
-        private static Dictionary<string, List<string>> Topics { get; set; } = new Dictionary<string, List<string>>();
         private static void SubThread()
         {
             byte[] bytes = new Byte[1024];
@@ -30,7 +29,7 @@ namespace PubSubLib
                 {
                     string data = null;
                     Console.WriteLine("Waiting for a connection...");
-                    Console.WriteLine(subEndIP.ToString());
+                    Console.WriteLine("Connected to " + subEndIP.ToString());
                     // Program is suspended while waiting for an incoming connection.  
                     Socket handler = subListener.Accept();
 
@@ -38,37 +37,43 @@ namespace PubSubLib
                     int bytesRec = handler.Receive(bytes);
                     data += Encoding.ASCII.GetString(bytes, 0, bytesRec);
                     Console.Write(data);
-                    string[] lines = data.Split(
-                        new string[] { "\n" }, StringSplitOptions.None);
+                    string[] lines = data.Split(" ");
 
-                    if (SubInfo.ContainsKey(lines[0]))
+                    if (String.Equals(lines[1], "sub"))
                     {
-                        SubInfo[lines[0]].Add(lines[1]);
-                    } else
-                    {
-                        SubInfo.Add(lines[0], new List<string> { lines[1] });
-                    }
-
-                    // Show the data on the console.  
-                    Console.WriteLine("ID: {0}, Topc: {1}", lines[0], lines[1]);
-
-                    // Echo the data back to the client.  
-                    byte[] msg = Encoding.ASCII.GetBytes("Subscribed to topic: " + lines[1]);
-
-                    handler.Send(msg);
-
-                    if (Topics.ContainsKey(lines[1]))
-                    {
-                        foreach(string message in Topics[lines[1]])
+                        if (SubInfo.ContainsKey(lines[0]))
                         {
-                            msg = Encoding.ASCII.GetBytes(lines[1] + ": " + message);
-                            handler.Send(msg);
+                            SubInfo[lines[0]].Add(lines[2]);
+                        }
+                        else
+                        {
+                            SubInfo.Add(lines[0], new List<string> { lines[2] });
                         }
 
-                    }
+                        // Show the data on the console.  
+                        Console.WriteLine("ID: {0}, Topc: {1}", lines[0], lines[2]);
 
-                    handler.Shutdown(SocketShutdown.Both);
-                    handler.Close();
+                        // Echo the data back to the client.  
+                        byte[] msg = Encoding.ASCII.GetBytes("subbed to topic: " + lines[2]);
+
+                        handler.Send(msg);
+
+                        handler.Shutdown(SocketShutdown.Both);
+                        handler.Close();
+
+                    }
+                    else if (String.Equals(lines[1], "unsub"))
+                    {
+                        SubInfo.Remove(lines[0]);
+                        // Send unsub message.
+                        Console.WriteLine("ID: {0} unsubbed from topic {1}", lines[0], lines[2]);
+                        byte[] msg = Encoding.ASCII.GetBytes("unsub from " + lines[2]);
+
+                        handler.Send(msg);
+
+                        handler.Shutdown(SocketShutdown.Both);
+                        handler.Close();
+                    }
                 }
 
             }
@@ -78,6 +83,11 @@ namespace PubSubLib
             }
 
         }
+        private static void ParseSubCommand()
+        {
+            // put the huge if statements in here.
+        }
+
         private static void PubThread()
         {
             byte[] bytes = new Byte[1024];
@@ -102,15 +112,6 @@ namespace PubSubLib
                     Console.Write(data);
                     string[] lines = data.Split(
                         new string[] { "\n" }, StringSplitOptions.None);
-                    
-                    if (Topics.ContainsKey(lines[0]))
-                    {
-                        Topics[lines[0]].Add(lines[1]);
-                    }
-                    else
-                    {
-                        Topics.Add(lines[0], new List<string> { lines[1] });
-                    }
 
                     // Show the data on the console.  
                     Console.WriteLine(lines[0] + ": " + lines[1]);
@@ -123,7 +124,7 @@ namespace PubSubLib
 
                     if (sublist.Count > 0)
                     {
-                        IPEndPoint subEndIP = new(IP.Host, IP.PubPort);
+                        IPEndPoint subEndIP = new(IP.Host, IP.SubRePort);
                         Socket subsender = new(IP.Host.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
                         subsender.Connect(subEndIP);
                         msg = Encoding.ASCII.GetBytes(lines[1] + "(" + lines[0] + ")");
@@ -156,9 +157,9 @@ namespace PubSubLib
         public static void StartBroker(IPInfo ip)
         {
             IP = ip;
-            Thread pub = new(PubThread);
+            //Thread pub = new(PubThread);
             Thread sub = new(SubThread);
-            pub.Start();
+            //pub.Start();
             sub.Start();
         }
     }
