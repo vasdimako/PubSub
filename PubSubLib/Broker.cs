@@ -16,12 +16,28 @@ namespace PubSubLib
         private static int SubPort { get; set; }
         private static int PubPort { get; set; }
         private static int MsgPort { get; set; }
-        public Broker(IPAddress ip, int subport, int pubport, int msgport)
+        public Broker(string run)
         {
-            IP = ip;
-            SubPort = subport;
-            PubPort = pubport;
-            MsgPort = msgport;
+            IP = IPAddress.Parse("127.0.0.1");
+            MsgPort = 9090;
+
+            string[] args = run.Split('-');
+            foreach (string arg in args)
+            {
+                switch (arg)
+                {
+                    case string s when s.StartsWith("s "):
+                        {
+                            SubPort = Int32.Parse(arg.Substring(2).Trim());
+                            break;
+                        }
+                    case string s when s.StartsWith("p "):
+                        {
+                            PubPort = Int32.Parse(arg.Substring(2).Trim());
+                            break;
+                        }
+                }
+            }
         }
         private static Dictionary<string, List<string>> SubInfo { get; set; } = new Dictionary<string, List<string>>();
         private static void SubThread()
@@ -84,18 +100,12 @@ namespace PubSubLib
                     // An incoming connection needs to be processed.  
                     int bytesRec = handler.Receive(bytes);
                     data += Encoding.ASCII.GetString(bytes, 0, bytesRec);
-                    Console.WriteLine(data);
-                    string[] args = data.Split(
-                        new string[] { " " }, StringSplitOptions.None);
-                    string[] command = args[0..3];
-                    string message = null;
 
-                    foreach (string msgbit in args[3..])
-                    {
-                        message += msgbit;
-                        message += " ";
-                    }
-                    message.TrimEnd();
+                    // Parse the data, separating the command arguments and message.
+                    Tuple<string[], string> t = Publisher.ParseCommand(data);
+                    string[] command = t.Item1;
+                    string message = t.Item2;
+
                     // Show the data on the console.  
                     Console.WriteLine(data);
 
@@ -109,9 +119,9 @@ namespace PubSubLib
                     {
                         IPEndPoint subEndIP = new(IP, MsgPort);
                         Socket subsender = new(IP.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-                        Console.WriteLine("Subscriber IP" + subEndIP.ToString());
+                        Console.WriteLine("Subscriber IP: " + subEndIP.ToString());
                         subsender.Connect(subEndIP);
-                        msg = Encoding.ASCII.GetBytes(message + "(" + args[2] + ")");
+                        msg = Encoding.ASCII.GetBytes(message + "(" + command[2] + ")");
                         Console.WriteLine("Sending message to subscriber");
                         subsender.Send(msg);
                     }
@@ -142,7 +152,7 @@ namespace PubSubLib
                         }
 
                         // Show the data on the console.  
-                        Console.WriteLine("ID: {0}, Topc: {1}", args[0], args[2]);
+                        Console.WriteLine("ID: {0}, Topic: {1}", args[0], args[2]);
 
                         // Echo the data back to the client.  
                         byte[] msg = Encoding.ASCII.GetBytes("subbed to topic: " + args[2]);
@@ -172,7 +182,6 @@ namespace PubSubLib
 
             foreach (string sub in SubInfo.Keys)
             {
-                Console.Write(SubInfo[sub].ToString());
                 if (SubInfo[sub].Contains(topic))
                 {
                     sublist.Add(sub);
@@ -180,7 +189,7 @@ namespace PubSubLib
             }
             return sublist;
         }
-        public static void StartBroker()
+        public void StartBroker()
         {
             Thread pub = new(PubThread);
             Thread sub = new(SubThread);

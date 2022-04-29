@@ -14,15 +14,7 @@ namespace PubSubLib
         private int IncMsgPort { get; }
         public IPAddress BrokerIP { get; set; }
         private int BrokerPort { get; }
-        private string[] CommandList { get; set; }
-        public string[] ParseCommand(string command)
-        {
-            return command.Split(" ");
-        }
-        public string GetSubInfo()
-        {
-            return (ID + "\n" + IncMsgPort.ToString() + "\n" + BrokerIP.ToString() + "\n" + BrokerPort.ToString() + "\n" + CommandList.ToString());
-        }
+        public string[] CommandList { get; set; }
         public Subscriber(string run)
         {
             string[] args = run.Split('-');
@@ -62,17 +54,37 @@ namespace PubSubLib
 
 
         }
-        public void Subscribe(string command)
+        public void Subscribe()
         {
+            Thread listen = new(SubListen);
+            listen.Start();
+
+            foreach (string command in CommandList)
+            {
+                SubSend(command);
+            }
+            while (true)
+            {
+                Console.WriteLine("Input wait time, sub/unsub and topic name:");
+                string input = Console.ReadLine();
+                SubSend(input);
+            }
+        }
+        private void SubSend(string command)
+        {
+            string[] commands = command.Split(" ");
+
+            int wait = Int32.Parse(commands[0]);
+            Thread.Sleep(1000 * wait);
+
             // Create a socket of a certain type.
             Socket subscriber = new(BrokerIP.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
             IPEndPoint endIP = new(BrokerIP, BrokerPort);
             // Create byte buffer.
             byte[] bytes = new byte[1024];
-            string[] commands = command.Split(" ");
+
             try
             {
-                Thread.Sleep(1000);
                 subscriber.Connect(endIP);
                 Console.WriteLine("Connected to {0}", subscriber.RemoteEndPoint.ToString());
 
@@ -92,9 +104,8 @@ namespace PubSubLib
                     //Release socket.
                     subscriber.Shutdown(SocketShutdown.Both);
                     subscriber.Close();
-                    return; // This ends the method
 
-                } 
+                }
                 else if (String.Equals(commands[1], "sub"))
                 {
                     // Encode the string into bytes.
@@ -125,6 +136,9 @@ namespace PubSubLib
             {
                 Console.WriteLine("Unexpected exception : {0}", e.ToString());
             }
+        }
+        private void SubListen()
+        {
             try
             {
                 // Create response socket - note this only happens if command[1] is sub
@@ -134,12 +148,11 @@ namespace PubSubLib
                 subResponse.Bind(subReEndIP);
                 subResponse.Listen(10);
 
-                // Start listening for connections.
                 while (true)
                 {
                     string resp = null;
+                    byte[] bytes = new byte[1024];
                     Console.WriteLine("Waiting for a connection...");
-                    Console.WriteLine(subReEndIP.ToString());
                     // Program is suspended while waiting for an incoming connection.  
                     Socket handler = subResponse.Accept();
 
@@ -147,21 +160,13 @@ namespace PubSubLib
                     int bytesRec = handler.Receive(bytes);
                     resp += Encoding.ASCII.GetString(bytes, 0, bytesRec);
                     Console.WriteLine(resp);
-                    string[] respl = resp.Split(" ");
-                    if (String.Equals(respl[0], "unsub"))
-                    {
-                        Console.WriteLine(resp);
-                        Console.ReadLine();
-                        return;
-                    }
                 }
-
             }
             catch (Exception e)
             {
                 Console.WriteLine(e.ToString());
             }
-
-        }
+            
+            }
     }
 }
