@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -9,17 +10,17 @@ using System.Threading.Tasks;
 
 namespace PubSubLib
 {
-    
+
     public class Broker
     {
         private static IPAddress IP { get; set; }
         private static int SubPort { get; set; }
         private static int PubPort { get; set; }
-        private static int MsgPort { get; set; }
+        private static ConcurrentDictionary<string, Socket> SubHandlers { get; set; } = new();
+        private static ConcurrentDictionary<string, Socket> PubHandlers { get; set; } = new();
         public Broker(string run)
         {
             IP = IPAddress.Parse("127.0.0.1");
-            MsgPort = 9090;
 
             string[] args = run.Split('-');
             foreach (string arg in args)
@@ -39,7 +40,7 @@ namespace PubSubLib
                 }
             }
         }
-        private static Dictionary<string, List<string>> SubInfo { get; set; } = new Dictionary<string, List<string>>();
+        private static ConcurrentDictionary<string, ConcurrentBag<string>> SubInfo { get; set; } = new ConcurrentDictionary<string, ConcurrentBag<string>>();
         private static void SubThread()
         {
             byte[] bytes = new Byte[1024];
@@ -51,24 +52,20 @@ namespace PubSubLib
                 Console.WriteLine(subEndIP.ToString());
                 subListener.Listen(10);
 
+                Thread handlerThread = new(LoopSubHandlers);
+                handlerThread.Start();
+
                 // Start listening for connections.
+                int temp = 0;
                 while (true)
                 {
                     string data = null;
                     Console.WriteLine("Waiting for a connection...");
-                    // Program is suspended while waiting for an incoming connection.  
-                    Socket handler = subListener.Accept();
+                    // Program is suspended while waiting for an incoming connection.
+                    SubHandlers.TryAdd(temp.ToString(), subListener.Accept());
                     Console.WriteLine("Connected to " + subEndIP.ToString());
                     // An incoming connection needs to be processed.  
-                    int bytesRec = handler.Receive(bytes);
-                    data += Encoding.ASCII.GetString(bytes, 0, bytesRec);
-                    Console.WriteLine(data);
-                    string[] lines = data.Split(" ");
-
-                    ParseCommand(lines, handler);
-
-                    handler.Shutdown(SocketShutdown.Both);
-                    handler.Close();
+                    temp++;
                 }
 
             }
@@ -78,56 +75,78 @@ namespace PubSubLib
             }
 
         }
- 
+        private static void LoopSubHandlers()
+        {
+            while (true)
+            {
+                foreach (KeyValuePair<string, Socket> handler in SubHandlers)
+                {
+                    byte[] bytes = new Byte[1024];
+                    string data = null;
+                    if (handler.Value.Available > 0)
+                    {
+                        int bytesRec = handler.Value.Receive(bytes);
+                        data += Encoding.ASCII.GetString(bytes, 0, bytesRec);
+                        Console.WriteLine(data);
+                        string[] lines = data.Split(" ");
+
+                        ParseSubCommand(lines, handler.Value);
+
+                        if (!handler.Key.StartsWith("s"))
+                        {
+                            SubHandlers.TryAdd(lines[0], handler.Value);
+                            SubHandlers.TryRemove(handler);
+                        }
+
+                    }
+
+                    //SubInfo.TryGetValue(handler.Key, out List<string> topics);
+                    //if (topics != null)
+                    //{
+                    //    foreach (string topic in topics)
+                    //    {
+                    //        Messages.TryGetValue(topic, out List<string> messages);
+                    //        if (messages != null)
+                    //        {
+                    //            foreach (string message in messages)
+                    //            {
+                    //                byte[] msg = Encoding.ASCII.GetBytes(message);
+                    //                handler.Value.Send(msg);
+                    //            }
+                    //        }
+                    //    }
+                    //}
+
+                    //Something about checking publishers.
+                }
+            }
+        }
+
         private static void PubThread()
         {
             byte[] bytes = new Byte[1024];
             IPEndPoint pubEndIP = new(IP, PubPort);
-            Socket publistener = new(IP.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+            Socket pubListener = new(IP.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
             try
             {
-                publistener.Bind(pubEndIP);
+                pubListener.Bind(pubEndIP);
                 Console.WriteLine(pubEndIP.ToString());
-                publistener.Listen(10);
+                pubListener.Listen(10);
+
+                Thread handlerThread = new(LoopPubHandlers);
+                handlerThread.Start();
+
                 // Start listening for connections.
+                int temp = 0;
                 while (true)
                 {
                     string data = null;
                     Console.WriteLine("Waiting for a connection...");
-                    // Program is suspended while waiting for an incoming connection.  
-                    Socket handler = publistener.Accept();
-                    Console.WriteLine(pubEndIP.ToString());
+                    // Program is suspended while waiting for an incoming connection.
+                    PubHandlers.TryAdd(temp.ToString(), pubListener.Accept());
+                    Console.WriteLine("Connected to " + pubEndIP.ToString());
                     // An incoming connection needs to be processed.  
-                    int bytesRec = handler.Receive(bytes);
-                    data += Encoding.ASCII.GetString(bytes, 0, bytesRec);
-
-                    // Parse the data, separating the command arguments and message.
-                    Tuple<string[], string> t = Publisher.ParseCommand(data);
-                    string[] command = t.Item1;
-                    string message = t.Item2;
-
-                    // Show the data on the console.  
-                    Console.WriteLine(data);
-
-                    // Echo the data back to the client.  
-                    byte[] msg = Encoding.ASCII.GetBytes("Received message: " + message + "(" + command[2] + ")");
-                    handler.Send(msg);
-
-                    List<string> sublist = CheckSubs(command[2]);
-
-                    if (sublist.Count > 0)
-                    {
-                        IPEndPoint subEndIP = new(IP, MsgPort);
-                        Socket subsender = new(IP.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-                        Console.WriteLine("Subscriber IP: " + subEndIP.ToString());
-                        subsender.Connect(subEndIP);
-                        msg = Encoding.ASCII.GetBytes(message + "(" + command[2] + ")");
-                        Console.WriteLine("Sending message to subscriber");
-                        subsender.Send(msg);
-                    }
-
-                    handler.Shutdown(SocketShutdown.Both);
-                    handler.Close();
+                    temp++;
                 }
 
             }
@@ -135,8 +154,53 @@ namespace PubSubLib
             {
                 Console.WriteLine(e.ToString());
             }
+
         }
-        private static void ParseCommand(string[] args, Socket handler)
+        private static void LoopPubHandlers()
+        {
+            byte[] bytes = new Byte[1024];
+            while (true)
+            {
+                foreach (KeyValuePair<string, Socket> handler in PubHandlers)
+                {
+                    if (handler.Value.Available > 0)
+                    {
+                        string data = null;
+                        int bytesRec = handler.Value.Receive(bytes);
+                        data += Encoding.ASCII.GetString(bytes, 0, bytesRec);
+                        Console.WriteLine(data);
+
+                        string pubname =  ParsePubCommand(data, handler.Value);
+                        
+                        if (!handler.Key.StartsWith("p"))
+                        {
+                            PubHandlers.TryAdd(pubname, handler.Value);
+                            PubHandlers.TryRemove(handler);
+                        }
+                    }
+
+                    //PubInfo.TryGetValue(handler.Key, out List<string> topics);
+                    //if (topics != null)
+                    //{
+                    //    foreach (string topic in topics)
+                    //    {
+                    //        Messages.TryGetValue(topic, out List<string> messages);
+                    //        if (messages != null)
+                    //        {
+                    //            foreach (string message in messages)
+                    //            {
+                    //                byte[] msg = Encoding.ASCII.GetBytes(message);
+                    //                handler.Value.Send(msg);
+                    //            }
+                    //        }
+                    //    }
+                    //}
+
+                    ////Something about checking publishers.
+                }
+            }
+        }
+        private static void ParseSubCommand(string[] args, Socket handler)
         {
             switch (args[1])
             {
@@ -148,7 +212,7 @@ namespace PubSubLib
                         }
                         else
                         {
-                            SubInfo.Add(args[0], new List<string> { args[2] });
+                            SubInfo.TryAdd(args[0], new ConcurrentBag<string> { args[2] });
                         }
 
                         // Show the data on the console.  
@@ -164,7 +228,8 @@ namespace PubSubLib
                     }
                 case string s when String.Equals(s, "unsub"):
                     {
-                        SubInfo.Remove(args[0]);
+                        ConcurrentBag<string> delval = SubInfo[args[0]];
+                        SubInfo.TryRemove(args[0], out delval);
                         // Send unsub message.
                         Console.WriteLine("ID: {0} unsubbed from topic {1}", args[0], args[2]);
                         byte[] msg = Encoding.ASCII.GetBytes("unsub from " + args[2]);
@@ -175,19 +240,39 @@ namespace PubSubLib
                     }
             }
         }
-
-        private static List<string> CheckSubs(string topic)
+        public static string ParsePubCommand(string command, Socket handler)
         {
-            var sublist = new List<string> { };
+            string[] process = command.Split(" ");
+            string[] commands = process[0..3];
 
-            foreach (string sub in SubInfo.Keys)
+            string message = null;
+            foreach (string msgbit in process[3..])
             {
-                if (SubInfo[sub].Contains(topic))
+                message += msgbit;
+                message += " ";
+            }
+            message = message.TrimEnd();
+
+            foreach (KeyValuePair<string, ConcurrentBag<string>> sub in SubInfo) 
+            {
+                if (sub.Value.Contains(commands[2]))
                 {
-                    sublist.Add(sub);
+                    byte[] msg = Encoding.ASCII.GetBytes("Received message: " + message + "(" + commands[2] + ")");
+                    SubHandlers[sub.Key].Send(msg);
                 }
             }
-            return sublist;
+            //if (Messages.ContainsKey(commands[2]))
+            //{
+            //    Messages[commands[2]].Add(message);
+            //} else
+            //{
+            //    List<string> messagelist = new();
+            //    messagelist.Add(message);
+            //    Messages.TryAdd(commands[2], messagelist);
+            //}
+            byte[] resp = Encoding.ASCII.GetBytes("Received message: " + message + "(" + commands[2] + ")");
+            handler.Send(resp);
+            return commands[0];
         }
         public void StartBroker()
         {
