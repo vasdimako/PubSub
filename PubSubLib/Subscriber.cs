@@ -52,7 +52,6 @@ namespace PubSubLib
                 }
         }
 
-
         }
         public void Subscribe()
         {
@@ -74,9 +73,6 @@ namespace PubSubLib
         {
             string[] commands = command.Split(" ");
 
-            int wait = Int32.Parse(commands[0]);
-            Thread.Sleep(1000 * wait);
-
             // Create a socket of a certain type.
             Socket subscriber = new(BrokerIP.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
             IPEndPoint endIP = new(BrokerIP, BrokerPort);
@@ -89,8 +85,27 @@ namespace PubSubLib
                 Console.WriteLine("Connected to {0}", subscriber.RemoteEndPoint.ToString());
 
                 // Check the command and either sub and continue with the code, or unsub and end method 
-                if (String.Equals(commands[1], "unsub"))
+                if (String.Equals(commands[1], "meta"))
                 {
+                    // Encode the string into bytes.
+                    byte[] msg = Encoding.ASCII.GetBytes(command);
+
+                    // Send the bytes.
+                    int bytesSent = subscriber.Send(msg);
+
+                    // Receive response from remote device.
+                    int bytesRec = subscriber.Receive(bytes);
+                    Console.WriteLine("{0}", Encoding.ASCII.GetString(bytes, 0, bytesRec));
+
+                    //Release socket.
+                    subscriber.Shutdown(SocketShutdown.Both);
+                    subscriber.Close();
+                }
+                else if (String.Equals(commands[1], "unsub"))
+                {
+                    int wait = Int32.Parse(commands[0]);
+                    Thread.Sleep(1000 * wait);
+
                     // Encode the string into bytes.
                     byte[] msg = Encoding.ASCII.GetBytes(ID + " " + commands[1] + " " + commands[2]);
 
@@ -108,6 +123,9 @@ namespace PubSubLib
                 }
                 else if (String.Equals(commands[1], "sub"))
                 {
+                    int wait = Int32.Parse(commands[0]);
+                    Thread.Sleep(1000 * wait);
+
                     // Encode the string into bytes.
                     byte[] msg = Encoding.ASCII.GetBytes(ID + " " + commands[1] + " " + commands[2]);
 
@@ -141,6 +159,9 @@ namespace PubSubLib
         {
             try
             {
+                SubSend(ID + " " + "meta" + " " + IncMsgPort.ToString());
+                Console.WriteLine(ID + " " + "meta" + " " + IncMsgPort.ToString());
+
                 // Create response socket - note this only happens if command[1] is sub
                 Socket subResponse = new(BrokerIP.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
                 IPEndPoint subReEndIP = new(BrokerIP, IncMsgPort);

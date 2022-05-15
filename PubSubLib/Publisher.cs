@@ -111,21 +111,6 @@ namespace PubSubLib
                 Console.WriteLine("Unexpected exception : {0}", e.ToString());
             }
         }
-        public static Tuple<string[], string> ParseCommand(string command)
-        {
-            string[] process = command.Split(" ");
-            string[] commands = process[0..3];
-
-            string message = null;
-            foreach (string msgbit in process[3..])
-            {
-                message += msgbit;
-                message += " ";
-            }
-            message.TrimEnd();
-
-            return Tuple.Create(commands, message);
-        }
     }
 
 }

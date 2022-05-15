@@ -15,14 +15,11 @@ namespace PubSubLib
         private static IPAddress IP { get; set; }
         private static int SubPort { get; set; }
         private static int PubPort { get; set; }
-        private static int MsgPort { get; set; }
-        public Broker(string run)
+        public Broker(string[] clArgs)
         {
             IP = IPAddress.Parse("127.0.0.1");
-            MsgPort = 9090;
 
-            string[] args = run.Split('-');
-            foreach (string arg in args)
+            foreach (string arg in clArgs)
             {
                 switch (arg)
                 {
@@ -65,8 +62,9 @@ namespace PubSubLib
                     Console.WriteLine(data);
                     string[] lines = data.Split(" ");
 
-                    ParseCommand(lines, handler);
+                    byte[] msg = ParseSubCommand(lines);
 
+                    handler.Send(msg);
                     handler.Shutdown(SocketShutdown.Both);
                     handler.Close();
                 }
@@ -102,7 +100,7 @@ namespace PubSubLib
                     data += Encoding.ASCII.GetString(bytes, 0, bytesRec);
 
                     // Parse the data, separating the command arguments and message.
-                    Tuple<string[], string> t = Publisher.ParseCommand(data);
+                    Tuple<string[], string> t = ParsePubCommand(data);
                     string[] command = t.Item1;
                     string message = t.Item2;
 
@@ -117,13 +115,17 @@ namespace PubSubLib
 
                     if (sublist.Count > 0)
                     {
-                        IPEndPoint subEndIP = new(IP, MsgPort);
-                        Socket subsender = new(IP.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-                        Console.WriteLine("Subscriber IP: " + subEndIP.ToString());
-                        subsender.Connect(subEndIP);
-                        msg = Encoding.ASCII.GetBytes(message + "(" + command[2] + ")");
-                        Console.WriteLine("Sending message to subscriber");
-                        subsender.Send(msg);
+                        foreach (string sub in sublist)
+                        {
+                            int subPort = Int32.Parse(SubInfo[sub][0]);
+                            IPEndPoint subEndIP = new(IP, subPort);
+                            Socket subsender = new(IP.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+                            Console.WriteLine("Subscriber IP: " + subEndIP.ToString());
+                            subsender.Connect(subEndIP);
+                            msg = Encoding.ASCII.GetBytes(message + "(" + command[2] + ")");
+                            Console.WriteLine("Sending message to subscriber");
+                            subsender.Send(msg);
+                        }
                     }
 
                     handler.Shutdown(SocketShutdown.Both);
@@ -136,19 +138,27 @@ namespace PubSubLib
                 Console.WriteLine(e.ToString());
             }
         }
-        private static void ParseCommand(string[] args, Socket handler)
+        private static byte[] ParseSubCommand(string[] args)
         {
             switch (args[1])
             {
+                case String s when String.Equals(s, "meta"):
+                    {
+                        SubInfo.Add(args[0], new List<string> { args[2] });
+
+                        // Show the data on the console.  
+                        Console.WriteLine("ID: {0}, Port: {1}", args[0], args[2]);
+
+                        // Echo the data back to the client.  
+                        byte[] msg = Encoding.ASCII.GetBytes("ID: " + args[0] + " " + "Port: " + args[2]);
+
+                        return msg;
+                    }
                 case string s when String.Equals(s, "sub"):
                     {
                         if (SubInfo.ContainsKey(args[0]))
                         {
                             SubInfo[args[0]].Add(args[2]);
-                        }
-                        else
-                        {
-                            SubInfo.Add(args[0], new List<string> { args[2] });
                         }
 
                         // Show the data on the console.  
@@ -157,10 +167,7 @@ namespace PubSubLib
                         // Echo the data back to the client.  
                         byte[] msg = Encoding.ASCII.GetBytes("subbed to topic: " + args[2]);
 
-                        handler.Send(msg);
-
-
-                        break;
+                        return msg;
                     }
                 case string s when String.Equals(s, "unsub"):
                     {
@@ -169,13 +176,27 @@ namespace PubSubLib
                         Console.WriteLine("ID: {0} unsubbed from topic {1}", args[0], args[2]);
                         byte[] msg = Encoding.ASCII.GetBytes("unsub from " + args[2]);
 
-                        handler.Send(msg);
-
-                        break;
+                        return msg;
                     }
             }
+            return null;
         }
 
+        public static Tuple<string[], string> ParsePubCommand(string command)
+        {
+            string[] process = command.Split(" ");
+            string[] commands = process[0..3];
+
+            string message = null;
+            foreach (string msgbit in process[3..])
+            {
+                message += msgbit;
+                message += " ";
+            }
+            message.TrimEnd();
+
+            return Tuple.Create(commands, message);
+        }
         private static List<string> CheckSubs(string topic)
         {
             var sublist = new List<string> { };
@@ -189,7 +210,7 @@ namespace PubSubLib
             }
             return sublist;
         }
-        public void StartBroker()
+        public static void StartBroker()
         {
             Thread pub = new(PubThread);
             Thread sub = new(SubThread);
