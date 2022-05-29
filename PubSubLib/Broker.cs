@@ -18,23 +18,22 @@ namespace PubSubLib
         private static int PubPort { get; set; }
         private static ConcurrentDictionary<string, Socket> SubHandlers { get; set; } = new();
         private static ConcurrentDictionary<string, Socket> PubHandlers { get; set; } = new();
-        public Broker(string run)
+        public Broker(string[] args)
         {
             IP = IPAddress.Parse("127.0.0.1");
 
-            string[] args = run.Split('-');
-            foreach (string arg in args)
+            for (int i = 0; i < args.Length; i++)
             {
-                switch (arg)
+                switch (args[i])
                 {
-                    case string s when s.StartsWith("s "):
+                    case string s when s.StartsWith("-s"):
                         {
-                            SubPort = Int32.Parse(arg.Substring(2).Trim());
+                            SubPort = Int32.Parse(args[i + 1]);
                             break;
                         }
-                    case string s when s.StartsWith("p "):
+                    case string s when s.StartsWith("-p"):
                         {
-                            PubPort = Int32.Parse(arg.Substring(2).Trim());
+                            PubPort = Int32.Parse(args[i + 1]);
                             break;
                         }
                 }
@@ -60,10 +59,10 @@ namespace PubSubLib
                 while (true)
                 {
                     string data = null;
-                    Console.WriteLine("Waiting for a connection...");
                     // Program is suspended while waiting for an incoming connection.
-                    SubHandlers.TryAdd(temp.ToString(), subListener.Accept());
-                    Console.WriteLine("Connected to " + subEndIP.ToString());
+                    Socket temphandler = subListener.Accept();
+                    SubHandlers.TryAdd(temp.ToString(), temphandler);
+                    Console.WriteLine("Connected to sub at " + temphandler.RemoteEndPoint.ToString());
                     // An incoming connection needs to be processed.  
                     temp++;
                 }
@@ -99,25 +98,6 @@ namespace PubSubLib
                         }
 
                     }
-
-                    //SubInfo.TryGetValue(handler.Key, out List<string> topics);
-                    //if (topics != null)
-                    //{
-                    //    foreach (string topic in topics)
-                    //    {
-                    //        Messages.TryGetValue(topic, out List<string> messages);
-                    //        if (messages != null)
-                    //        {
-                    //            foreach (string message in messages)
-                    //            {
-                    //                byte[] msg = Encoding.ASCII.GetBytes(message);
-                    //                handler.Value.Send(msg);
-                    //            }
-                    //        }
-                    //    }
-                    //}
-
-                    //Something about checking publishers.
                 }
             }
         }
@@ -141,10 +121,10 @@ namespace PubSubLib
                 while (true)
                 {
                     string data = null;
-                    Console.WriteLine("Waiting for a connection...");
                     // Program is suspended while waiting for an incoming connection.
-                    PubHandlers.TryAdd(temp.ToString(), pubListener.Accept());
-                    Console.WriteLine("Connected to " + pubEndIP.ToString());
+                    Socket temphandler = pubListener.Accept();
+                    PubHandlers.TryAdd(temp.ToString(), temphandler);
+                    Console.WriteLine("Connected to pub at " + temphandler.RemoteEndPoint.ToString());
                     // An incoming connection needs to be processed.  
                     temp++;
                 }
@@ -178,25 +158,6 @@ namespace PubSubLib
                             PubHandlers.TryRemove(handler);
                         }
                     }
-
-                    //PubInfo.TryGetValue(handler.Key, out List<string> topics);
-                    //if (topics != null)
-                    //{
-                    //    foreach (string topic in topics)
-                    //    {
-                    //        Messages.TryGetValue(topic, out List<string> messages);
-                    //        if (messages != null)
-                    //        {
-                    //            foreach (string message in messages)
-                    //            {
-                    //                byte[] msg = Encoding.ASCII.GetBytes(message);
-                    //                handler.Value.Send(msg);
-                    //            }
-                    //        }
-                    //    }
-                    //}
-
-                    ////Something about checking publishers.
                 }
             }
         }
@@ -219,10 +180,9 @@ namespace PubSubLib
                         Console.WriteLine("ID: {0}, Topic: {1}", args[0], args[2]);
 
                         // Echo the data back to the client.  
-                        byte[] msg = Encoding.ASCII.GetBytes("subbed to topic: " + args[2]);
+                        byte[] msg = Encoding.ASCII.GetBytes("OK");
 
                         handler.Send(msg);
-
 
                         break;
                     }
@@ -232,7 +192,7 @@ namespace PubSubLib
                         SubInfo.TryRemove(args[0], out delval);
                         // Send unsub message.
                         Console.WriteLine("ID: {0} unsubbed from topic {1}", args[0], args[2]);
-                        byte[] msg = Encoding.ASCII.GetBytes("unsub from " + args[2]);
+                        byte[] msg = Encoding.ASCII.GetBytes("OK");
 
                         handler.Send(msg);
 
@@ -257,20 +217,11 @@ namespace PubSubLib
             {
                 if (sub.Value.Contains(commands[2]))
                 {
-                    byte[] msg = Encoding.ASCII.GetBytes("Received message: " + message + "(" + commands[2] + ")");
+                    byte[] msg = Encoding.ASCII.GetBytes("Received msg for topic " + commands[2] + ": " + message);
                     SubHandlers[sub.Key].Send(msg);
                 }
             }
-            //if (Messages.ContainsKey(commands[2]))
-            //{
-            //    Messages[commands[2]].Add(message);
-            //} else
-            //{
-            //    List<string> messagelist = new();
-            //    messagelist.Add(message);
-            //    Messages.TryAdd(commands[2], messagelist);
-            //}
-            byte[] resp = Encoding.ASCII.GetBytes("Received message: " + message + "(" + commands[2] + ")");
+            byte[] resp = Encoding.ASCII.GetBytes("OK");
             handler.Send(resp);
             return commands[0];
         }

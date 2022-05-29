@@ -11,37 +11,35 @@ namespace PubSubLib
         private IPAddress BrokerIP { get; set; }
         private int BrokerPort { get; set; }
         public string[] CommandList { get; set; }
-        public Publisher(string runargs)
+        public Publisher(string[] args)
         {
-            string[] args = runargs.Split('-');
-            foreach (string arg in args)
+            for (int i = 0; i < args.Length; i++)
             {
-                Console.WriteLine(arg);
-                switch (arg)
+                switch (args[i])
                 {
-                    case string s when s.StartsWith("i "):
+                    case string s when s.Equals("-i"):
                         {
-                            ID = arg.Substring(2).Trim();
+                            ID = args[i + 1];
                             break;
                         }
-                    case string s when s.StartsWith("r "):
+                    case string s when s.Equals("-r"):
                         {
-                            PubPort = Int32.Parse(arg.Substring(2).Trim());
+                            PubPort = Int32.Parse(args[i + 1]);
                             break;
                         }
-                    case string s when s.StartsWith("h "):
+                    case string s when s.Equals("-h"):
                         {
-                            BrokerIP = IPAddress.Parse(arg.Substring(2).Trim());
+                            BrokerIP = IPAddress.Parse(args[i + 1]);
                             break;
                         }
-                    case string s when s.StartsWith("p "):
+                    case string s when s.Equals("-p"):
                         {
-                            BrokerPort = Int32.Parse(arg.Substring(2).Trim());
+                            BrokerPort = Int32.Parse(args[i + 1]);
                             break;
                         }
-                    case string s when s.StartsWith("f "):
+                    case string s when s.Equals("-f"):
                         {
-                            string filepath = "C:/Users/Vasilis/source/repos/PubSub/" + arg.Substring(2).Trim();
+                            string filepath = "C:/Users/Vasilis/source/repos/PubSub/" + args[i + 1];
                             CommandList = File.ReadAllLines(filepath);
                             break;
                         }
@@ -63,7 +61,6 @@ namespace PubSubLib
 
                 foreach (string command in CommandList)
                 {
-                    Console.WriteLine("Command Loop");
                     PubCommand(publisher, command);
                 }
                 while (true)
@@ -107,7 +104,7 @@ namespace PubSubLib
 
             // Receive response from remote device.
             int bytesRec = publisher.Receive(bytes);
-            Console.WriteLine("{0}", Encoding.ASCII.GetString(bytes, 0, bytesRec));
+            Console.WriteLine("Published msg for topic " + commands[2] + ": " + message);
         }
 
         private static (string[], string) ParseCommand(string command)
@@ -125,55 +122,5 @@ namespace PubSubLib
 
             return (commands, message);
         }
-
-        //        private void PubSend(string command)
-        //    {
-        //        // Create a socket of a certain type.
-        //        Socket publisher = new(BrokerIP.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-        //        IPEndPoint endIP = new(BrokerIP, BrokerPort);
-        //        // Create byte buffer.
-        //        byte[] bytes = new byte[1024];
-
-        //        // Parse command, returning command terms and message in a tuple.
-        //        Tuple<string[], string> t = ParseCommand(command);
-        //        string[] commands = t.Item1;
-        //        string message = t.Item2;
-
-        //        // Wait for number of seconds specified in command.
-        //        int wait = Int32.Parse(commands[0]);
-        //        Thread.Sleep(1000 * wait);
-
-        //        try
-        //        {
-        //            publisher.Connect(endIP);
-        //            Console.WriteLine("Connected to {0}", publisher.RemoteEndPoint.ToString());
-        //            string data = ID + " " + commands[1] + " " + commands[2] + " " + message;
-        //            // Encode the string into bytes.
-        //            byte[] msg = Encoding.ASCII.GetBytes(data);
-
-        //            // Send the bytes.
-        //            int bytesSent = publisher.Send(msg);
-
-        //            // Receive response from remote device.
-        //            int bytesRec = publisher.Receive(bytes);
-        //            Console.WriteLine("{0}", Encoding.ASCII.GetString(bytes, 0, bytesRec));
-        //            //Release socket.
-        //            publisher.Shutdown(SocketShutdown.Both);
-        //            publisher.Close();
-        //        }
-        //        catch (ArgumentNullException ane)
-        //        {
-        //            Console.WriteLine("ArgumentNullException : {0}", ane.ToString());
-        //        }
-        //        catch (SocketException se)
-        //        {
-        //            Console.WriteLine("SocketException : {0}", se.ToString());
-        //        }
-        //        catch (Exception e)
-        //        {
-        //            Console.WriteLine("Unexpected exception : {0}", e.ToString());
-        //        }
-        //    }
-        //}
     }
 }

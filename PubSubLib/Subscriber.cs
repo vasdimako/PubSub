@@ -15,44 +15,40 @@ namespace PubSubLib
         public IPAddress BrokerIP { get; set; }
         private int BrokerPort { get; }
         public string[] CommandList { get; set; }
-        public Subscriber(string run)
-        {
-            string[] args = run.Split('-');
-            foreach (string arg in args)
+        public Subscriber(string[] args) {
+
+            for (int i = 0; i < args.Length; i++)
             {
-                Console.WriteLine(arg);
-                switch (arg)
+                switch (args[i])
                 {
-                    case string s when s.StartsWith("i"):
+                    case string s when s.StartsWith("-i"):
                         {
-                            ID = arg.Substring(2).Trim();
+                            ID = args[i + 1];
                             break;
                         }
-                    case string s when s.StartsWith("r"):
+                    case string s when s.StartsWith("-r"):
                         {
-                            IncMsgPort = Int32.Parse(arg.Substring(2).Trim());
+                            IncMsgPort = Int32.Parse(args[i + 1]);
                             break;
                         }
-                    case string s when s.StartsWith("h"):
+                    case string s when s.StartsWith("-h"):
                         {
-                            BrokerIP = IPAddress.Parse(arg.Substring(2).Trim());
+                            BrokerIP = IPAddress.Parse(args[i + 1]);
                             break;
                         }
-                    case string s when s.StartsWith("p"):
+                    case string s when s.StartsWith("-p"):
                         {
-                            BrokerPort = Int32.Parse(arg.Substring(2).Trim());
+                            BrokerPort = Int32.Parse(args[i + 1]);
                             break;
                         }
-                    case string s when s.StartsWith("f"):
+                    case string s when s.StartsWith("-f"):
                         {
-                            string filepath = "C:/Users/Vasilis/source/repos/PubSub/" + arg.Substring(2).Trim();
+                            string filepath = "C:/Users/Vasilis/source/repos/PubSub/" + args[i + 1];
                             CommandList = File.ReadAllLines(filepath);
                             break;
                         }
                 }
             }
-
-
         }
         public void Subscribe()
         {
@@ -70,7 +66,6 @@ namespace PubSubLib
 
                 foreach (string command in CommandList)
                 {
-                    Console.WriteLine(command);
                     SubCommand(subscriber, command);
                 }
 
@@ -97,9 +92,9 @@ namespace PubSubLib
         }
         private void SubCommand(Socket subscriber, string command)
         {
+            Console.WriteLine(command);
             string[] commands = command.Split(" ");
             Thread.Sleep(int.Parse(commands[0])*1000);
-
             byte[] bytes = new byte[1024];
 
             // Encode the string into bytes.
@@ -118,70 +113,4 @@ namespace PubSubLib
             }
         }
     }
-    //private void SubSend(string command)
-    //{
-    //    string[] commands = command.Split(" ");
-
-    //    int wait = Int32.Parse(commands[0]);
-    //    Thread.Sleep(1000 * wait);
-
-    //    // Create a socket of a certain type.
-    //    Socket subscriber = new(BrokerIP.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-    //    IPEndPoint endIP = new(BrokerIP, BrokerPort);
-    //    // Create byte buffer.
-    //    byte[] bytes = new byte[1024];
-
-    //    try
-    //    {
-    //        subscriber.Connect(endIP);
-    //        Console.WriteLine("Connected to {0}", subscriber.RemoteEndPoint.ToString());
-
-    //        // Check the command and either sub and continue with the code, or unsub and end method 
-
-
-    //    }
-    //    catch (ArgumentNullException ane)
-    //    {
-    //        Console.WriteLine("ArgumentNullException : {0}", ane.ToString());
-    //    }
-    //    catch (SocketException se)
-    //    {
-    //        Console.WriteLine("SocketException : {0}", se.ToString());
-    //    }
-    //    catch (Exception e)
-    //    {
-    //        Console.WriteLine("Unexpected exception : {0}", e.ToString());
-    //    }
-    //}
-    //private void SubListen()
-    //{
-    //    try
-    //    {
-    //        // Create response socket - note this only happens if command[1] is sub
-    //        Socket subResponse = new(BrokerIP.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-    //        IPEndPoint subReEndIP = new(BrokerIP, IncMsgPort);
-
-    //        subResponse.Bind(subReEndIP);
-    //        subResponse.Listen(10);
-
-    //        while (true)
-    //        {
-    //            string resp = null;
-    //            byte[] bytes = new byte[1024];
-    //            Console.WriteLine("Waiting for a connection...");
-    //            // Program is suspended while waiting for an incoming connection.  
-    //            Socket handler = subResponse.Accept();
-
-    //            // An incoming connection needs to be processed.  
-    //            int bytesRec = handler.Receive(bytes);
-    //            resp += Encoding.ASCII.GetString(bytes, 0, bytesRec);
-    //            Console.WriteLine(resp);
-    //        }
-    //    }
-    //    catch (Exception e)
-    //    {
-    //        Console.WriteLine(e.ToString());
-    //    }
-
-    //    }
 }
