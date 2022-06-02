@@ -10,14 +10,41 @@ using System.Threading.Tasks;
 
 namespace PubSubLib
 {
-
+    /// <summary>
+    /// This is the broker class. After creating an object and specifying 
+    /// the various arguments it must be launched with the <c>StartBroker</c> method.
+    /// </summary>
     public class Broker
     {
+        /// <summary>
+        /// IP address is set to 127.0.0.1.
+        /// </summary>
         private static IPAddress IP { get; set; }
+        /// <summary>
+        /// Specified by the -s argument, port to listen for subscriber connections.
+        /// </summary>
         private static int SubPort { get; set; }
+        /// <summary>
+        /// Specified by the -p argument, port to listen for publisher connections.
+        /// </summary>
         private static int PubPort { get; set; }
+        /// <summary>
+        /// Dictionary with sub IDs as the keys and Sockets of the connection between
+        /// broker and the sub with that ID. Concurrent so that it is thread-safe.
+        /// Initially uses a temporary key which is replaced when the first message is received.
+        /// </summary>
         private static ConcurrentDictionary<string, Socket> SubHandlers { get; set; } = new();
+        /// <summary>
+        /// Dictionary with pub IDs as the keys and Sockets of the connection between
+        /// broker and the pub with that ID. Concurrent so that it is thread-safe.
+        /// Initially uses a temporary key which is replaced when the first message is received.
+        /// </summary>
         private static ConcurrentDictionary<string, Socket> PubHandlers { get; set; } = new();
+        /// <summary>
+        /// Constructs the broker object.
+        /// </summary>
+        /// <param name="args">Takes specified CLI arguments in a string array 
+        /// and parses them into the correct broker properties.</param>
         public Broker(string[] args)
         {
             IP = IPAddress.Parse("127.0.0.1");
@@ -39,8 +66,16 @@ namespace PubSubLib
                 }
             }
         }
+        /// <summary>
+        /// Concurrent Dictionary with sub ID as the key and ConcurrentBag (List) of strings as the value.
+        /// Topics each sub is subscribed to are stored here.
+        /// </summary>
         private static ConcurrentDictionary<string, ConcurrentBag<string>> SubInfo { get; set; } = new ConcurrentDictionary<string, ConcurrentBag<string>>();
-        private static void SubThread()
+        /// <summary>
+        /// Listen for subscribers and add the Socket connection to SubHandlers.
+        /// </summary>
+        /// <param name="token">Cancellation token for exiting out of thread.</param>
+        private static void SubThread(CancellationToken token)
         {
             byte[] bytes = new Byte[1024];
             IPEndPoint subEndIP = new(IP, SubPort);
@@ -51,8 +86,8 @@ namespace PubSubLib
                 Console.WriteLine(subEndIP.ToString());
                 subListener.Listen(10);
 
-                Thread handlerThread = new(LoopSubHandlers);
-                handlerThread.Start();
+                Thread close = new(() => CloseSocket(subListener, token));
+                close.Start();
 
                 // Start listening for connections.
                 int temp = 0;
@@ -70,14 +105,27 @@ namespace PubSubLib
             }
             catch (Exception e)
             {
-                Console.WriteLine(e.ToString());
+                Console.WriteLine("Subscriber socket closed.");
             }
 
         }
-        private static void LoopSubHandlers()
+        /// <summary>
+        /// Loops through all sub handlers and receives data if it is available. Parses new commands.
+        /// If a command from a handler with a temporary name is passed, that handler is renamed to the sub ID.
+        /// </summary>
+        /// <param name="token">For thread cancellation.</param>
+        private static void LoopSubHandlers(CancellationToken token)
         {
             while (true)
             {
+                if (token.IsCancellationRequested)
+                {
+                    // If cancellation is requested, close all handler Sockets and exit thread.
+                    foreach (KeyValuePair<string, Socket> handler in SubHandlers)
+                        handler.Value.Close();
+                    Console.WriteLine("SubHandler sockets and thread closed.");
+                    break;
+                }
                 foreach (KeyValuePair<string, Socket> handler in SubHandlers)
                 {
                     byte[] bytes = new Byte[1024];
@@ -87,13 +135,13 @@ namespace PubSubLib
                         int bytesRec = handler.Value.Receive(bytes);
                         data += Encoding.ASCII.GetString(bytes, 0, bytesRec);
                         Console.WriteLine(data);
-                        string[] lines = data.Split(" ");
 
-                        ParseSubCommand(lines, handler.Value);
+                        string subID = ParseSubCommand(data, handler.Value);
 
                         if (!handler.Key.StartsWith("s"))
                         {
-                            SubHandlers.TryAdd(lines[0], handler.Value);
+                            // The temp handler key is replaced with the subscriber ID from the incoming message.
+                            SubHandlers.TryAdd(subID, handler.Value);
                             SubHandlers.TryRemove(handler);
                         }
 
@@ -101,8 +149,11 @@ namespace PubSubLib
                 }
             }
         }
-
-        private static void PubThread()
+        /// <summary>
+        /// Listen for subscribers and add the Socket connection to PubHandlers.
+        /// </summary>
+        /// <param name="token">Cancellation token for exiting out of thread.</param>
+        private static void PubThread(CancellationToken token)
         {
             byte[] bytes = new Byte[1024];
             IPEndPoint pubEndIP = new(IP, PubPort);
@@ -113,8 +164,8 @@ namespace PubSubLib
                 Console.WriteLine(pubEndIP.ToString());
                 pubListener.Listen(10);
 
-                Thread handlerThread = new(LoopPubHandlers);
-                handlerThread.Start();
+                Thread close = new(() => CloseSocket(pubListener, token));
+                close.Start();
 
                 // Start listening for connections.
                 int temp = 0;
@@ -132,15 +183,28 @@ namespace PubSubLib
             }
             catch (Exception e)
             {
-                Console.WriteLine(e.ToString());
+                Console.WriteLine("Publisher socket closed.");
             }
 
         }
-        private static void LoopPubHandlers()
+        /// <summary>
+        /// Loops through all pub handlers and receives data if it is available. Parses new commands.
+        /// If a command from a handler with a temporary name is passed, that handler is renamed to the pub ID.
+        /// </summary>
+        /// <param name="token">For thread cancellation.</param>
+        private static void LoopPubHandlers(CancellationToken token)
         {
             byte[] bytes = new Byte[1024];
             while (true)
             {
+                if (token.IsCancellationRequested)
+                {
+                    // If cancellation is requested, close all handler Sockets and exit thread.
+                    foreach (KeyValuePair<string, Socket> handler in PubHandlers)
+                        handler.Value.Close();
+                    Console.WriteLine("PubHandler sockets and thread closed.");
+                    break;
+                }
                 foreach (KeyValuePair<string, Socket> handler in PubHandlers)
                 {
                     if (handler.Value.Available > 0)
@@ -150,19 +214,27 @@ namespace PubSubLib
                         data += Encoding.ASCII.GetString(bytes, 0, bytesRec);
                         Console.WriteLine(data);
 
-                        string pubname =  ParsePubCommand(data, handler.Value);
+                        string pubID =  ParsePubCommand(data, handler.Value);
                         
                         if (!handler.Key.StartsWith("p"))
                         {
-                            PubHandlers.TryAdd(pubname, handler.Value);
+                            // The temp handler key is replaced with the publisher ID from the incoming message.
+                            PubHandlers.TryAdd(pubID, handler.Value);
                             PubHandlers.TryRemove(handler);
                         }
                     }
                 }
             }
         }
-        private static void ParseSubCommand(string[] args, Socket handler)
+        /// <summary>
+        /// Parse command text, add or remove topic from SubInfo and send OK message.
+        /// </summary>
+        /// <param name="line">Command.</param>
+        /// /// <param name="handler">Socket corresponding to the subscriber.</param>
+        private static string ParseSubCommand(string line, Socket handler)
         {
+
+            string[] args = line.Split(" ");
             switch (args[1])
             {
                 case string s when String.Equals(s, "sub"):
@@ -199,7 +271,15 @@ namespace PubSubLib
                         break;
                     }
             }
+            return args[0];
         }
+        /// <summary>
+        /// Parse command text, loop through SubInfo dictionary and send message through
+        /// the appropriate subhandlers. Then send OK response.
+        /// </summary>
+        /// <param name="command">Command string</param>
+        /// <param name="handler">Publisher handler.</param>
+        /// <returns></returns>
         public static string ParsePubCommand(string command, Socket handler)
         {
             string[] process = command.Split(" ");
@@ -225,12 +305,47 @@ namespace PubSubLib
             handler.Send(resp);
             return commands[0];
         }
+        /// <summary>
+        /// Thread to close sockets waiting in the .Accept() method.
+        /// </summary>
+        /// <param name="handler">Socket to be closed.</param>
+        /// <param name="token">Cancellation token.</param>
+        private static void CloseSocket(Socket handler, CancellationToken token) {
+            while (true)
+            {
+                if (token.IsCancellationRequested)
+                {
+                    handler.Close();
+                    break;
+                }
+            }
+        }
+        /// <summary>
+        /// Start all broker threads. Accepts the exit CLI command.
+        /// </summary>
         public void StartBroker()
         {
-            Thread pub = new(PubThread);
-            Thread sub = new(SubThread);
-            pub.Start();
+            CancellationTokenSource cancelToken = new();
+            
+            Thread sub = new(() => SubThread(cancelToken.Token));
+            Thread subHandlerThread = new(() => LoopSubHandlers(cancelToken.Token));
+            subHandlerThread.Start();
             sub.Start();
+
+            Thread pub = new(() => PubThread(cancelToken.Token));
+            Thread pubHandlerThread = new(() => LoopPubHandlers(cancelToken.Token));
+            pub.Start();
+            pubHandlerThread.Start();
+
+            string input = Console.ReadLine();
+            if (input.Equals("exit"))
+            {
+                Console.WriteLine("Closing threads...");
+                cancelToken.Cancel();
+                Thread.Sleep(1500);
+                Console.WriteLine("Press enter to exit.");
+                Console.ReadLine();
+            }
         }
     }
 }

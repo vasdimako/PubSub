@@ -4,7 +4,7 @@ string[] clArgs;
 
 if (Environment.GetCommandLineArgs().Length <= 1)
 {
-    clArgs = "-s 9000 -p 9050".Split(" ");
+    clArgs = "broker -s 9000 -p 9050".Split(" ");
 }
 
 else

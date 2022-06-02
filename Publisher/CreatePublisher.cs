@@ -4,7 +4,7 @@ string[] clArgs;
 
 if (Environment.GetCommandLineArgs().Length <= 1)
 {
-    clArgs = "-i p1 -r 8200 -h 127.0.0.1 -p 9050 -f publisher1.cmd".Split(" ");
+    clArgs = "publisher -i p1 -r 8200 -h 127.0.0.1 -p 9050 -f publisher1.cmd".Split(" ");
 } else
 {
     clArgs = Environment.GetCommandLineArgs()[1..];
