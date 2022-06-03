@@ -44,7 +44,7 @@ namespace PubSubLib
         /// Concurrent Dictionary with sub ID as the key and ConcurrentBag (List) of strings as the value.
         /// Topics each sub is subscribed to are stored here.
         /// </summary>
-        private static ConcurrentDictionary<string, ConcurrentDictionary<string, bool>> SubInfo { get; set; } = new();
+        private static ConcurrentDictionary<string, ConcurrentDictionary<string, bool>> Topics { get; set; } = new();
         /// <summary>
         /// Constructs the broker object.
         /// </summary>
@@ -239,15 +239,15 @@ namespace PubSubLib
             {
                 case string s when String.Equals(s, "sub"):
                     {
-                        if (SubInfo.ContainsKey(args[0]))
+                        if (Topics.ContainsKey(args[2]))
                         {
-                            SubInfo[args[0]].TryAdd(args[2], true);
+                            Topics[args[2]].TryAdd(args[0], true);
                         }
                         else
                         {
                             ConcurrentDictionary<string, bool> n = new();
-                            n.TryAdd(args[2], true);
-                            SubInfo.TryAdd(args[0], n);
+                            n.TryAdd(args[0], true);
+                            Topics.TryAdd(args[2], n);
                         }
 
                         // Show the data on the console.  
@@ -262,7 +262,7 @@ namespace PubSubLib
                     }
                 case string s when String.Equals(s, "unsub"):
                     {
-                        SubInfo[args[0]].TryUpdate(args[2], false, true);
+                        Topics[args[2]].TryUpdate(args[0], false, true);
                         // Send unsub message.
                         Console.WriteLine("ID: {0} unsubbed from topic {1}", args[0], args[2]);
                         byte[] msg = Encoding.ASCII.GetBytes("OK");
@@ -288,15 +288,18 @@ namespace PubSubLib
 
             string message = String.Join(" ", process[3..]);
 
-            foreach (KeyValuePair<string, ConcurrentDictionary<string, bool>> sub in SubInfo) 
+            if (Topics.ContainsKey(commands[2]))
             {
-                bool t = new();
-                if (sub.Value.TryGetValue(commands[2], out t))
+                foreach (KeyValuePair<string, bool> sub in Topics[commands[2]])
                 {
-                    if (t)
+                    bool t;
+                    if (Topics[commands[2]].TryGetValue(sub.Key, out t))
                     {
-                        byte[] msg = Encoding.ASCII.GetBytes("Received msg for topic " + commands[2] + ": " + message);
-                        SubHandlers[sub.Key].Send(msg);
+                        if (t)
+                        {
+                            byte[] msg = Encoding.ASCII.GetBytes("Received msg for topic " + commands[2] + ": " + message);
+                            SubHandlers[sub.Key].Send(msg);
+                        }
                     }
                 }
             }
