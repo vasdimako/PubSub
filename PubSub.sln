@@ -10,7 +10,9 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{2D13995F-49A5-4A2A-B342-271D2294AF69}"
 	ProjectSection(SolutionItems) = preProject
 		publisher1.cmd = publisher1.cmd
+		publisher2.cmd = publisher2.cmd
 		subscriber1.cmd = subscriber1.cmd
+		subscriber2.cmd = subscriber2.cmd
 	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Broker", "Broker\Broker.csproj", "{C26CAF19-3134-4948-B17E-452C62C7424F}"
