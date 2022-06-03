@@ -41,6 +41,11 @@ namespace PubSubLib
         /// </summary>
         private static ConcurrentDictionary<string, Socket> PubHandlers { get; set; } = new();
         /// <summary>
+        /// Concurrent Dictionary with sub ID as the key and ConcurrentBag (List) of strings as the value.
+        /// Topics each sub is subscribed to are stored here.
+        /// </summary>
+        private static ConcurrentDictionary<string, ConcurrentBag<string>> SubInfo { get; set; } = new();
+        /// <summary>
         /// Constructs the broker object.
         /// </summary>
         /// <param name="args">Takes specified CLI arguments in a string array 
@@ -66,12 +71,7 @@ namespace PubSubLib
                 }
             }
         }
-        /// <summary>
-        /// Concurrent Dictionary with sub ID as the key and ConcurrentBag (List) of strings as the value.
-        /// Topics each sub is subscribed to are stored here.
-        /// </summary>
-        private static ConcurrentDictionary<string, ConcurrentBag<string>> SubInfo { get; set; } = new ConcurrentDictionary<string, ConcurrentBag<string>>();
-        /// <summary>
+               /// <summary>
         /// Listen for subscribers and add the Socket connection to SubHandlers.
         /// </summary>
         /// <param name="token">Cancellation token for exiting out of thread.</param>
@@ -285,13 +285,7 @@ namespace PubSubLib
             string[] process = command.Split(" ");
             string[] commands = process[0..3];
 
-            string message = null;
-            foreach (string msgbit in process[3..])
-            {
-                message += msgbit;
-                message += " ";
-            }
-            message = message.TrimEnd();
+            string message = String.Join(" ", process[3..]);
 
             foreach (KeyValuePair<string, ConcurrentBag<string>> sub in SubInfo) 
             {

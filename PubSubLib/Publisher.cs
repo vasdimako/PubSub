@@ -133,15 +133,12 @@ namespace PubSubLib
         private void PubCommand(Socket publisher, string command)
         {
             byte[] bytes = new byte[1024];
-            (string[], string) t = ParseCommand(command);
-            string[] commands = t.Item1;
-            string message = t.Item2;
-
+            string[] process = command.Split(" ");
             // Wait for number of seconds specified in command.
-            int wait = Int32.Parse(commands[0]);
+            int wait = Int32.Parse(process[0]);
             Thread.Sleep(1000 * wait);
 
-            string data = ID + " " + commands[1] + " " + commands[2] + " " + message;
+            string data = ID + " " + String.Join(" ", process[1..]);
             Console.WriteLine(data);
             // Encode the string into bytes.
             byte[] msg = Encoding.ASCII.GetBytes(data);
@@ -151,27 +148,7 @@ namespace PubSubLib
 
             // Receive response from remote device.
             int bytesRec = publisher.Receive(bytes);
-            Console.WriteLine("Published msg for topic {0}: {1}", commands[2], message);
-        }
-        /// <summary>
-        /// Command parsing, separating into the command components and the message to be published.
-        /// </summary>
-        /// <param name="command"></param>
-        /// <returns></returns>
-        private static (string[], string) ParseCommand(string command)
-        {
-            string[] process = command.Split(" ");
-            string[] commands = process[0..3];
-
-            string message = null;
-            foreach (string msgbit in process[3..])
-            {
-                message += msgbit;
-                message += " ";
-            }
-            message.TrimEnd();
-
-            return (commands, message);
+            Console.WriteLine("Published msg for topic {0}: {1}", process[2], String.Join(" ", process[3..]));
         }
     }
 }

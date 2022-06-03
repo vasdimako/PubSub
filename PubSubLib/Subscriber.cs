@@ -21,7 +21,7 @@ namespace PubSubLib
         /// <summary>
         /// The -r argument, subscriber port.
         /// </summary>
-        private int SubIP { get; }
+        private int SubPort { get; }
         /// <summary>
         /// The -h argument, broker IP.
         /// </summary>
@@ -53,7 +53,7 @@ namespace PubSubLib
                         }
                     case string s when s.StartsWith("-r"):
                         {
-                            SubIP = Int32.Parse(args[i + 1]);
+                            SubPort = Int32.Parse(args[i + 1]);
                             break;
                         }
                     case string s when s.StartsWith("-h"):
@@ -81,7 +81,7 @@ namespace PubSubLib
         public void Subscribe()
         {
             // Subscriber IP and port.
-            IPEndPoint localIP = new(BrokerIP, SubIP);
+            IPEndPoint localIP = new(BrokerIP, SubPort);
             // Broker IP and port.
             IPEndPoint endIP = new(BrokerIP, BrokerPort);
             Socket subscriber = new(BrokerIP.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
